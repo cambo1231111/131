@@ -1,15 +1,12 @@
-require('colors')
 const sqlite = require('better-sqlite3');
-const db = new sqlite('database.db'); // This will create the database file if it doesn't exist
+const db = new sqlite('database.db');
 
 function initializeDatabase() {
     // Create users table
     db.exec(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT,
-            hwid TEXT,
+            hwid TEXT NOT NULL UNIQUE,
             expirationDate DATETIME NOT NULL,
             hwidBanned BOOLEAN DEFAULT 0
         )
@@ -26,7 +23,7 @@ function initializeDatabase() {
         )
     `);
 
-    console.log("Sucesso ".green + 'SQLite database initialized and tables created/verified.');
+    console.log("Success ".green + 'SQLite database initialized and tables created/verified.');
 }
 
 module.exports = {
