@@ -1,41 +1,41 @@
 const express = require('express');
 const router = express.Router();
-
-const { db } = require('../Database'); // Import the SQLite database instance
-
+const { db } = require('../Database');
 const rateLimiter = require('../middleware/rateLimiter');
-router.post('/register', rateLimiter, async (req, res) => {
-    console.log('Requisição recebida em /register:', req.body);
-    const { hwid, username, key, password } = req.body;
+const verifySignature = require('../middleware/verifySignature');
 
-    // Verificar a validade da chave (Check key validity)
+router.post('/register', rateLimiter, verifySignature, async (req, res) => {
+    console.log('Request received at /register:', req.body);
+    const { hwid, key } = req.body;
+
+    // Check key validity
     const validKey = db.prepare('SELECT * FROM keys WHERE key = ? AND used = 0 AND expirationDate > ?').get(key, new Date().toISOString());
     if (!validKey) {
-        return res.status(403).json({ error: 'Chave inválida ou expirada.' });
+        return res.status(403).json({ error: 'Invalid or expired key.' });
     }
 
-    // Check if user already exists (by username)
-    const existingUser = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    // Check if HWID is already registered
+    const existingUser = db.prepare('SELECT * FROM users WHERE hwid = ?').get(hwid);
     if (existingUser) {
-        return res.status(400).json({ error: 'Usuário já existe.' });
+        return res.status(400).json({ error: 'HWID already registered.' });
     }
 
     try {
-        // Marcar a chave como usada (Mark the key as used)
+        // Mark the key as used
         db.prepare('UPDATE keys SET used = 1 WHERE id = ?').run(validKey.id);
 
         let expirationDate = new Date(validKey.expirationDate);
 
         // Create new user in the database
-        const stmt = db.prepare('INSERT INTO users (hwid, username, expirationDate, password) VALUES (?, ?, ?, ?)');
-        const info = stmt.run(hwid, username, expirationDate.toISOString(), password);
+        const stmt = db.prepare('INSERT INTO users (hwid, expirationDate) VALUES (?, ?)');
+        const info = stmt.run(hwid, expirationDate.toISOString());
 
-        console.log('User salvo no banco de dados, ID:', info.lastInsertRowid);
+        console.log('User saved to database, ID:', info.lastInsertRowid);
 
-        res.json({ message: 'Login criado com sucesso', expirationDate });
+        res.json({ message: 'Registration successful', expirationDate });
     } catch (error) {
-        console.error('Erro ao registrar user ou usar key no SQLite:', error);
-        res.status(500).json({ error: 'Erro ao registrar usuário.' });
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Error registering user.' });
     }
 });
 
